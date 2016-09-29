@@ -150,7 +150,7 @@ int main(int argc, char * argv[])
 	{	printf("1\n");
 
 
-		if(pcap_sendpacket(handle, arp_reqpack, sizeof(arphdr)+sizeof(ether_header)) != 0  )
+		if(pcap_sendpacket(handle, arp_reqpack, sizeof(ether_arp)+sizeof(ether_header)) != 0  )
         	{
                		 printf("fail to send packet");
                		 return -1;
