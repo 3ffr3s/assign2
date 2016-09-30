@@ -14,7 +14,7 @@
 #include<string.h>
 
 #define ip 100
-int getattackerinfo(sockaddr_in * attacker_ip , unsigned char *attacker_mac , sockaddr_in * gateway_ip)
+int getattackerinfo(sockaddr_in * attacker_ip , unsigned char *attacker_mac , sockaddr_in * gateway_ip, char * dev)
 {	
 	int sock;
 	struct ifreq ifr;
@@ -30,7 +30,7 @@ int getattackerinfo(sockaddr_in * attacker_ip , unsigned char *attacker_mac , so
         }       
 //attacker's mac_address       
 	memset(&ifr,0x00,sizeof(ifr));
-	strcpy(ifr.ifr_name,"ens33");
+	strcpy(ifr.ifr_name,(const char *)dev);
         ifr.ifr_addr.sa_family=AF_INET;
         if(ioctl(sock,SIOCGIFHWADDR,&ifr) != 0 )
 	{
@@ -86,7 +86,7 @@ int main(int argc, char * argv[])
 	unsigned char * victim_mac=NULL;
 	struct sockaddr_in * gateway_ip=NULL;
 	const u_char *data;
-	int result;
+	int result, t;
 	struct in_addr victim_ip;
 	ether_header * cmp_ethernet;
 	ether_arp * cmp_arp;
@@ -148,30 +148,29 @@ int main(int argc, char * argv[])
                		 printf("fail to send packet");
                		 return -1;
         	}
+		for(t=0;t<100;t++)
+		{
+			result=pcap_next_ex(handle, &header, &data);
+			if(result != 1)
+				continue;
 
-		result=pcap_next_ex(handle, &header, &data);
-		if(result != 1)
+			cmp_ethernet=(ether_header *)data;
+	
+			if(ntohs(cmp_ethernet->ether_type) !=0x0806)
+				continue;
+	
+			cmp_arp=(ether_arp *)(data+14);
+
+			if(ntohs(cmp_arp->arp_op) != ARPOP_REPLY)
+				continue;
+			
+			if(memcmp(cmp_arp->arp_spa, &victim_ip,sizeof(in_addr)) != 0)
+				continue;
+			memcpy(victim_mac ,cmp_arp->arp_sha,ETHER_ADDR_LEN);
+				break;
+		}
+		if(t==100)
 			continue;
-
-		cmp_ethernet=(ether_header *)data;
-
-		if(ntohs(cmp_ethernet->ether_type) !=0x0806)
-			continue;
-
-		cmp_arp=(ether_arp *)(data+14);
-
-		if(ntohs(cmp_arp->arp_op) != ARPOP_REPLY)
-			continue;
-
-		memcpy(&test_ip,cmp_arp->arp_spa, sizeof(in_addr));
-		test=inet_ntoa(victim_ip);
-		printf("%s", test);
-		test=inet_ntoa(test_ip);
-		printf("%s", test);
-
-		if(memcmp(cmp_arp->arp_spa, &victim_ip,sizeof(in_addr)) != 0)
-			continue;
-		memcpy(victim_mac ,cmp_arp->arp_sha,ETHER_ADDR_LEN);
 		break;
 	}
 
